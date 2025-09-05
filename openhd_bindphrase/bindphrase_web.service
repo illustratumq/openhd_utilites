@@ -3,6 +3,9 @@ Description=web_server_bind_phrase
 After=network.target
 
 [Service]
+[Service]
+Environment=FLASK_SECRET_KEY="1073741824qwerty"
+Environment=DEV_PASSWORD="1073741824"
 Type=simple
 User=openhd 
 ExecStart=/usr/bin/python3 /home/openhd/dev/openhd_bindphrase/app.py

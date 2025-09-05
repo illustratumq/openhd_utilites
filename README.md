@@ -20,4 +20,4 @@
 * autoATTACH.service
 * crsf.service
 * search_drone.service
-
+* fake_dns.service

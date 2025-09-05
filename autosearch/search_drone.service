@@ -1,0 +1,13 @@
+[Unit]
+Description=autosearch_btn_service
+After=network.target
+
+[Service]
+Type=simple
+User=openhd 
+ExecStart=/usr/bin/python3 /home/openhd/dev/autosearch/auto_search_btn.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
