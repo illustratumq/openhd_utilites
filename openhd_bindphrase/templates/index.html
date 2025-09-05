@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover для safe-area (notch), initial-scale=1 без зума -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0e0e0e">
+  <title>OpenHD Control Panel</title>
+  <style>
+    :root{
+      --bg: #0e0e0e;
+      --card-max-w: 520px;
+      --radius: 12px;
+      --gap: 10px;
+      --tap: 44px;                /* Apple HIG min target */
+      --fs: clamp(14px, 1.6vw, 16px);
+      --fs-sm: clamp(13px, 1.4vw, 15px);
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: var(--bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100dvh;      /* iOS/Android dynamic viewport */
+      min-height: 100vh;       /* fallback */
+      margin: 0;
+      overflow: hidden;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .container {
+      background: #fff;
+      padding: 20px;
+      padding-left:  max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
+      padding-top:   max(20px, env(safe-area-inset-top));
+      padding-bottom:max(20px, env(safe-area-inset-bottom));
+      border-radius: var(--radius);
+      box-shadow: 0 0 20px rgba(125,125,125,.5);
+      width: 100%;
+      max-width: var(--card-max-w);
+      text-align: center;
+      position: relative;
+      transition: all .3s ease;
+      max-height: 90dvh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .tabs{
+      position: sticky;
+      top: 0;
+      display: flex;
+      gap: var(--gap);
+      justify-content: space-between;
+      background: #fff;
+      z-index: 10;
+      padding: 6px 0 10px;
+      overflow-x: auto;                 /* горизонтальний скрол на вузьких */
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab{
+      flex: 1 0 auto;
+      min-width: 120px;
+      background: #e8e8e8;
+      padding: 10px 8px;
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      box-shadow: 0 -2px 5px rgba(0,0,0,.1);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--fs-sm);
+      white-space: nowrap;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab img{
+      width: 18px; height: 18px; margin-right: 6px;
+      image-rendering: -webkit-optimize-contrast;
+    }
+    .tab.active { background-color: #fff; font-weight: bold; }
+    .tab:active{ transform: translateY(1px); }
+
+    h1 { font-size: clamp(18px, 2.4vw, 22px); margin: 0 0 16px; }
+    h3 { margin: 10px 0 6px; font-size: var(--fs); }
+
+    input, select, textarea, button {
+      width: 100%;
+      min-height: var(--tap);
+      font-size: 16px;                  /* ключ до відключення авто-зуму на iOS */
+      margin-bottom: 10px;
+      border: 1px solid #b4b4b4;
+      border-radius: 8px;
+      text-align: center;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    textarea {
+      height: 100px;
+      resize: none;
+      text-align: left;
+    }
+
+    button{
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover{ background-color: #0056b3; }
+    button:active{ transform: translateY(1px); }
+
+    .btn-red{ background-color: #e53935; }
+    .btn-red:hover{ background-color: #c62828; }
+
+    .content { display: none; }
+    .content.active { display: block; }
+
+    .frequency-grid{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .frequency{
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .frequency.selected{ background: #007bff; color: #fff; }
+
+    #fileContent {
+      width: 100%;
+      height: 200px;
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 20px;
+      border: 1px solid #007bff;
+      border-radius: 8px;
+      box-sizing: border-box;
+      resize: none;
+    }
+
+    table{
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      border-radius: 8px;
+      display: block;             /* щоб overflow-x працював */
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    thead, tbody, tr{ display: table; width: 100%; table-layout: fixed; }
+    th, td{
+      padding: 6px;
+      border: 1px solid rgba(173,173,173,.5);
+      text-align: center;
+      font-size: var(--fs-sm);
+      box-shadow: 0 3px 20px rgba(233,228,228,.1);
+    }
+
+    .modal{
+      display:none; position:fixed; left:0; top:0; width:100%; height:100%;
+      background-color: rgba(0,0,0,.45);
+      justify-content: center; align-items: center;
+      padding: env(safe-area-inset-bottom) 16px 16px;
+    }
+    .modal-content{
+      background: #fff; padding: 20px; border-radius: 12px; text-align:center;
+      width: min(420px, 100%); box-shadow: 0 0 10px rgba(0,0,255,.2);
+    }
+    .modal-buttons button{ min-width: 45%; min-height: var(--tap); }
+
+    :focus-visible{
+      outline: 3px solid rgba(0,123,255,.6);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+
+    @media (pointer: coarse){
+      input, select, textarea, button { min-height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainContainer"
+       data-is-air="{{ 'true' if is_air else 'false' }}"
+       data-dev-unlocked="{{ 'true' if dev_unlocked else 'false' }}">
+
+    <div class="tabs" role="tablist" aria-label="Main tabs">
+      <div class="tab active" data-target="bind" role="tab" aria-selected="true" tabindex="0">
+        <img src="/static/bind.png" alt="" aria-hidden="true">Bind Phrase
+      </div>
+      <div class="tab" data-target="freq" role="tab" aria-selected="false" tabindex="0">
+        <img src="/static/freq.png" alt="" aria-hidden="true">Frequencies
+      </div>
+      <div class="tab" data-target="dev" role="tab" aria-selected="false" tabindex="0">
+        <img src="/static/lock.png" alt="" aria-hidden="true">Dev
+      </div>
+    </div>
+
+    <div id="bind" class="content active" role="tabpanel" aria-labelledby="bind">
+      <h1>Vyriy OHD</h1>
+      <input type="text" value="{{ current_phrase }}" readonly aria-label="Current bind phrase">
+      <input type="text" id="bind_phrase" placeholder="Введіть нову бінд фразу" required aria-label="New bind phrase">
+      <button onclick="savePhrase()" aria-label="Save bind phrase">Save</button>
+    </div>
+
+    <div id="freq" class="content" role="tabpanel" aria-labelledby="freq">
+      <h3>Оберіть відео канали</h3>
+      <p id="selectedCount">Канали між якими буде перемикання: 0</p>
+      <div class="frequency-grid" id="freqGrid"></div>
+
+      <table aria-label="Video link settings">
+        <tr>
+          <td><h3>RC канал відео</h3></td>
+          <td><h3>Перемикання</h3></td>
+          <td><h3>Шифрування</h3></td>
+          <td><h3>Базова частота</h3></td>
+        </tr>
+        <tr>
+          <td><select id="rcChannelSelect" aria-label="Video RC channel"></select></td>
+          <td><select id="switchToggle" aria-label="Channel switching enabled">
+            <option value="true">Так</option>
+            <option value="false">Ні</option>
+          </select></td>
+          <td><select id="encryptionToggle" aria-label="Encryption enabled">
+            <option value="true">Так</option>
+            <option value="false">Ні</option>
+          </select></td>
+          <td><select id="baseFreqSelect" aria-label="Base frequency"></select></td>
+        </tr>
+
+        {% if not is_air %}
+        <tr>
+          <td><h3>RC канал MCS</h3></td>
+          <td><h3>MCS базовий</h3></td>
+          <td><h3>RC канал FEC</h3></td>
+          <td><h3>FEC набір</h3></td>
+        </tr>
+        <tr>
+          <td><select id="mcsRcChannel" aria-label="MCS RC channel"></select></td>
+          <td>
+            <select id="mcsToggle" aria-label="MCS value">
+              <option value="0">MCS0</option>
+              <option value="1">MCS1</option>
+              <option value="2">MCS2</option>
+            </select>
+          </td>
+          <td><select id="fecRcChannel" aria-label="FEC RC channel"></select></td>
+          <td>
+            <select id="fecToggle" aria-label="FEC set">
+              <option value="20,35,50">[1]20,35,50</option>
+              <option value="20,50,90">[2]20,50,90</option>
+              <option value="20,25,30">[3]20,25,30</option>
+              <option value="0,20,30">[4]0,20,30</option>
+              <option value="5,20,30">[5]5,20,30</option>
+            </select>
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+
+      <button onclick="submitChannels(event)" aria-label="Apply settings">SET</button>
+      <button class="btn-red" onclick="showModal()" aria-label="Reboot system">REBOOT</button>
+    </div>
+
+    <div id="dev" class="content" role="tabpanel" aria-labelledby="dev">
+      <div id="devLock" style="display:none; text-align:center; margin:20px 0;">
+        <h3>Dev доступ</h3>
+        <input type="password" id="devPassword" placeholder="Введіть пароль" aria-label="Dev password" />
+        <button onclick="unlockDev()" aria-label="Unlock developer mode">Розблокувати режим розробника</button>
+      </div>
+
+      <div id="devBody" style="display:none;">
+        <h3 style="text-align:center">Оберіть дію</h3>
+        <select id="fileSelect" aria-label="Choose file or action">
+          <option value="openhd_custom_params">Файл openhd_custom_params.json</option>
+          <option value="base_wb_params">Файл basw_wb_params.json</option>
+          <option value="openhd">Поточна версія OHD</option>
+          <option value="config">Файл config.txt</option>
+          <option value="usb">Показати USB пристрої</option>
+        </select>
+
+        <textarea id="fileContent" placeholder="Завантажте файл для редагування або покажіть USB пристрої..." readonly aria-label="File content"></textarea>
+        <button onclick="changeView()" aria-label="Show content">Відобразити вміст</button>
+        <button onclick="saveFile()" aria-label="Save file">Зберегти зміни</button>
+        <button onclick="downloadFile()" aria-label="Download file">Скачати файл</button>
+        <button class="btn-red" onclick="logoutDev()" aria-label="Lock developer mode">Lock</button>
+      </div>
+    </div>
+
+    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm reboot">
+      <div class="modal-content">
+        <h2>Дані змінено, перезавантажити зараз?</h2>
+        <div class="modal-buttons">
+          <button onclick="rebootSystem()">Yes</button>
+          <button onclick="closeModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const freqs = [5180, 5200, 5220, 5240, 5260, 5280, 5300, 5320, 5500, 5520, 5540, 5560, 5580, 5600, 5620, 5640, 5660, 5680, 5700, 5720, 5745, 5765, 5785, 5805, 5825, 5845, 5865, 5885];
+      let selected = new Set();
+      const isAir = document.getElementById('mainContainer').dataset.isAir === 'true';
+
+      // Tabs interactions + keyboard accessibility
+      document.querySelectorAll('.tab').forEach(tab => {
+        const activate = () => {
+          document.querySelectorAll('.tab').forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+
+          const target = tab.getAttribute('data-target');
+          document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+          document.getElementById(target).classList.add('active');
+        };
+
+        tab.addEventListener('click', activate);
+        tab.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); activate();
+          }
+        });
+      });
+
+      function renderFreqGrid() {
+        const grid = document.getElementById('freqGrid');
+        grid.innerHTML = '';
+        freqs.forEach(freq => {
+          const div = document.createElement('div');
+          div.className = 'frequency';
+          div.textContent = freq + ' MHz';
+          if (selected.has(freq)) div.classList.add('selected');
+          div.onclick = () => toggleFreq(freq, div);
+          grid.appendChild(div);
+        });
+      }
+
+      function toggleFreq(freq, div) {
+        if (selected.has(freq)) {
+          selected.delete(freq);
+          div.classList.remove('selected');
+        } else {
+          selected.add(freq);
+          div.classList.add('selected');
+        }
+        document.getElementById('selectedCount').textContent =
+          `Канали між якими буде перемикання: ${selected.size}`;
+      }
+
+      function submitChannels(event) {
+        const setButton = event.target;
+        const freqsList = Array.from(selected);
+        const rcChannel = parseInt(document.getElementById("rcChannelSelect").value);
+        const featureEnabled = JSON.parse(document.getElementById('switchToggle').value);
+        const encryptionEnabled = JSON.parse(document.getElementById('encryptionToggle').value);
+        const baseFreq = parseInt(document.getElementById("baseFreqSelect").value);
+
+        const mcsRcEl = document.getElementById("mcsRcChannel");
+        const fecRcEl = document.getElementById("fecRcChannel");
+        const mcsToggleEl = document.getElementById("mcsToggle");
+        const fecToggleEl = document.getElementById("fecToggle");
+
+        const payload = {
+          channels: freqsList,
+          rc_channel: rcChannel,
+          switch_by_rc_enabled: featureEnabled,
+          encryption: encryptionEnabled,
+          base_freq: baseFreq,
+        };
+
+        if (mcsRcEl && mcsToggleEl) {
+          payload.rc_channel_mcs = parseInt(mcsRcEl.value);
+          payload.mcs_value = mcsToggleEl.value;
+        }
+        if (fecRcEl && fecToggleEl) {
+          payload.rc_channel_fec = parseInt(fecRcEl.value);
+          payload.fec_value = fecToggleEl.value;
+        }
+
+        setButton.disabled = true;
+        const originalText = setButton.textContent;
+        setButton.textContent = "Saving...";
+
+        fetch('/save-frequencies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(resp => {
+          setButton.textContent = resp.status === 'success' ? "Sucessfully saved!" : "Error";
+          setTimeout(() => {
+            setButton.disabled = false;
+            setButton.textContent = originalText;
+          }, 1000);
+        })
+        .catch(() => {
+          setButton.disabled = false;
+          setButton.textContent = originalText;
+          alert("Помилка при збереженні налаштувань.");
+        });
+      }
+
+      function rebootSystem() {
+        fetch('/reboot', { method: 'POST' })
+          .then(() => alert("System rebooting..."))
+          .catch(() => alert("Не вдалося надіслати команду перезавантаження"));
+      }
+
+      function showModal() {
+        document.getElementById("modal").style.display = "flex";
+      }
+      function closeModal() {
+        document.getElementById("modal").style.display = "none";
+      }
+
+      function savePhrase() {
+        let phrase = document.getElementById("bind_phrase").value;
+        fetch('/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bind_phrase: phrase })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'success') showModal();
+          else alert("Не вдалося зберегти бінд-фразу");
+        })
+        .catch(() => alert("Помилка мережі при збереженні"));
+      }
+
+      let currentMode = "file"; // "file" або "usb"
+
+      function changeView() {
+        const selectedValue = document.getElementById("fileSelect").value;
+        if (selectedValue === "usb") {
+          currentMode = "usb";
+          showUsbDevices();
+        } else {
+          currentMode = "file";
+          editFile();
+        }
+      }
+
+      function editFile() {
+        const fileName = document.getElementById("fileSelect").value;
+        fetch(`/get-file/${fileName}`)
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById("fileContent").value = data.content || 'Файл недоступний.';
+            document.getElementById("fileContent").removeAttribute("readonly");
+          })
+          .catch(() => {
+            alert("Помилка при спробі зчитати файл.");
+          });
+      }
+
+      function saveFile() {
+        if (currentMode !== "file") return;
+        const fileName = document.getElementById("fileSelect").value;
+        const content = document.getElementById("fileContent").value;
+
+        fetch(`/save-file/${fileName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: content })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            alert("Файл успішно збережено!");
+          } else {
+            alert("Помилка при спробі зберегти файл.");
+          }
+        })
+        .catch(() => {
+          alert("Помилка при спробі зберегти файл.");
+        });
+      }
+
+      function downloadFile() {
+        if (currentMode !== "file") return;
+        const fileName = document.getElementById("fileSelect").value;
+        fetch(`/download-file/${fileName}`)
+          .then(res => res.blob())
+          .then(blob => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+          })
+          .catch(() => {
+            alert("Помилка при спробі скачати файл.");
+          });
+      }
+
+      function showUsbDevices() {
+        document.getElementById("fileContent").setAttribute("readonly", "true");
+        fetch('/usb-devices')
+          .then(res => res.json())
+          .then(data => {
+            const textarea = document.getElementById('fileContent');
+            textarea.value = data.devices || "Не знайдено USB девайсів.";
+          })
+          .catch(() => {
+            alert("Помилка при спробі показати USB девайси.");
+          });
+      }
+
+      // ===== Dev lock/unlock =====
+      function reflectDevState() {
+        const unlocked = document.getElementById('mainContainer').dataset.devUnlocked === 'true';
+        document.getElementById('devLock').style.display = unlocked ? 'none' : 'block';
+        document.getElementById('devBody').style.display = unlocked ? 'block' : 'none';
+      }
+
+      function unlockDev() {
+        const pwd = document.getElementById('devPassword').value.trim();
+        fetch('/dev-login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({password: pwd})
+        })
+        .then(r => r.json())
+        .then(res => {
+          if (res.status === 'ok') {
+            document.getElementById('mainContainer').dataset.devUnlocked = 'true';
+            reflectDevState();
+          } else {
+            alert('Невірний пароль');
+          }
+        })
+        .catch(() => alert('Помилка авторизації'));
+      }
+
+      function logoutDev() {
+        fetch('/dev-logout', {method:'POST'})
+          .then(() => {
+            document.getElementById('mainContainer').dataset.devUnlocked = 'false';
+            reflectDevState();
+          });
+      }
+
+      // ===== Mobile UX helpers =====
+      // 1) підстраховка від авто-зуму (якщо десь лишився <16px)
+      document.querySelectorAll('input, select, textarea').forEach(el=>{
+        if (parseInt(getComputedStyle(el).fontSize) < 16){
+          el.style.fontSize = '16px';
+        }
+      });
+      // 2) скрол до поля під клавіатуру
+      const focusIntoView = (e)=>{
+        const el = e.target;
+        setTimeout(()=> el.scrollIntoView({block:'center', behavior:'smooth'}), 100);
+      };
+      document.addEventListener('focusin', focusIntoView);
+      // 3) пасивні слухачі для скролів
+      ['touchstart','touchmove','wheel'].forEach(evt=>{
+        window.addEventListener(evt, ()=>{}, {passive:true});
+      });
+
+      window.onload = () => {
+        const baseFreqSelect = document.getElementById("baseFreqSelect");
+        baseFreqSelect.innerHTML = freqs.map(f => `<option value="${f}">${f} MHz</option>`).join('');
+
+        fetch('/get-frequencies')
+          .then(r => r.json())
+          .then(data => {
+            selected = new Set(data.channels || []);
+            document.getElementById("rcChannelSelect").innerHTML =
+              [...Array(16).keys()]
+                .map(i => `<option value="${i+1}" ${data.rc_channel === i+1 ? 'selected' : ''}>Channel ${i+1}</option>`)
+                .join('');
+
+            const mcsRc = document.getElementById("mcsRcChannel");
+            const fecRc = document.getElementById("fecRcChannel");
+            if (mcsRc) {
+              mcsRc.innerHTML =
+                [...Array(16).keys()]
+                  .map(i => `<option value="${i+1}" ${data.rc_channel_mcs === i+1 ? 'selected' : ''}>Channel ${i+1}</option>`)
+                  .join('');
+            }
+            if (fecRc) {
+              fecRc.innerHTML =
+                [...Array(16).keys()]
+                  .map(i => `<option value="${i+1}" ${data.rc_channel_fec === i+1 ? 'selected' : ''}>Channel ${i+1}</option>`)
+                  .join('');
+            }
+
+            document.getElementById('encryptionToggle').value = data.encryption;
+            document.getElementById('switchToggle').value = data.switch_by_rc_enabled;
+            document.getElementById('baseFreqSelect').value = data.base_freq || freqs[0];
+
+            const mcsToggle = document.getElementById('mcsToggle');
+            if (mcsToggle) mcsToggle.value = (data.mcs_value ?? 1);
+
+            renderFreqGrid();
+            document.getElementById('selectedCount').textContent =
+              `Канали між якими буде перемикання: ${selected.size}`;
+          })
+          .catch(() => {
+            renderFreqGrid();
+          });
+
+        reflectDevState();
+      };
+    </script>
+  </div>
+</body>
+</html>

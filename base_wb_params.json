@@ -1,0 +1,20 @@
+{
+    "enable_wb_video_variable_bitrate": true,
+    "wb_air_mcs_index": 0,
+    "wb_air_tx_channel_width": 20,
+    "wb_bw_via_rc_channel": 0,
+    "wb_dev_air_set_high_retransmit_count": false,
+    "wb_enable_ldpc": true,
+    "wb_enable_listen_only_mode": true,
+    "wb_enable_short_guard": false,
+    "wb_enable_stbc": 1,
+    "wb_frequency": 5300,
+    "wb_max_fec_block_size": -1,
+    "wb_mcs_index_via_rc_channel": 9,
+    "wb_rtl8812au_tx_pwr_idx_override": 53,
+    "wb_rtl8812au_tx_pwr_idx_override_armed": 1,
+    "wb_tx_power_milli_watt": 100,
+    "wb_tx_power_milli_watt_armed": 100,
+    "wb_video_fec_percentage": 5,
+    "wb_video_rate_for_mcs_adjustment_percent": 100
+}

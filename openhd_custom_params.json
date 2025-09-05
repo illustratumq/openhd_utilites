@@ -1,0 +1,16 @@
+{
+    "rc_channel": 8,
+    "encryption": false,
+    "switch_by_rc_enabled": true,
+    "channels": [
+        5300
+    ],
+    "base_freq": 5300,
+    "mcs_value": "0",
+    "rc_channel_fec": 10,
+    "rc_channel_mcs": 9,
+    "fec_value": "5,20,30",
+    "fec_percent_1": "5",
+    "fec_percent_2": "20",
+    "fec_percent_3": "30"
+}
